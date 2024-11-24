@@ -7,8 +7,8 @@ if (getgenv().vac) then
 end;
 
 local scriptLoadAt = tick();
-local scriptVersion = 1;
-local discordCode = '';
+local scriptVersion = 2;
+local discordCode = 'Gxg42Eshpy';
 
 local cloneref = cloneref or function(inst) return inst; end;
 local tweenService = cloneref(game:GetService('TweenService'));
@@ -1257,6 +1257,7 @@ do -- commands list
 	local list = commands.list;
 
 	list['eject'] = 'fully unloades the script';
+	list['discord'] = 'joins the discord sever and copies it to your clipboard';
 	list['checkversion / checkver'] = 'checks the script version';
 	list['reexecute / reexec'] = 'executes the latest version of the script';
 	list['commands / cmds'] = 'shows a list of commands';
@@ -1315,6 +1316,8 @@ do -- commands list
 	list['unflyjump / unjetpack'] = 'disables fly jump';
 	list['loopbring [player] [distance?]'] = 'brings players to you';
 	list['unloopbring'] = 'disables loop bring';
+	list['fling'] = 'flings peoplpe';
+	list['unfling / nofling'] = 'stops flinging people';
 end;
 
 do -- commands
@@ -1326,6 +1329,33 @@ do -- commands
 	local lightService = cloneref(game:GetService('Lighting'));
 
 	commands.register('eject', vac.unload);
+
+	commands.register('discord', function()
+		if (setclipboard) then
+			setclipboard(string.format('https://discord.gg/%s', discordCode));
+			vac.log('server invite has been copied to clipboard', 0);
+		end;
+
+		if (request) then
+			for i = 6463, 6472 do
+				pcall(function()
+					request({
+						Url = string.format('http://127.0.0.1:%s/rpc?v=1', i),
+						Method = 'POST',
+						Headers = {
+							['Content-Type'] = 'application/json',
+							Origin = 'https://discord.com'
+						},
+						Body = ('{"cmd":"INVITE_BROWSER","args":{"code":"%s"},"nonce":"%s"}'):format(discordCode, string.lower(httpService:GenerateGUID(false)))
+					});
+				end);
+			end;
+
+			return;
+		end;
+
+		vac.log(string.format('discord server: discord.gg/%s', discordCode), 0);
+	end);
 
 	commands.register('checkversion', function()
 		vac.log('getting version, hold on a sec...', 0);

@@ -8,6 +8,7 @@ end;
 
 local scriptLoadAt = tick();
 local scriptVersion = 1;
+local discordCode = '';
 
 local cloneref = cloneref or function(inst) return inst; end;
 local tweenService = cloneref(game:GetService('TweenService'));
@@ -1924,12 +1925,41 @@ do -- end
 	vac.log(string.format('loaded in %.02f seconds', tick() - scriptLoadAt), 0, Color3.fromRGB(0, 255, 0));
 	vac.log('click insert to toggle the ui', 0);
 
+	local usingOutdated = false;
+
 	task.spawn(function()
 		repeat task.wait(); until vac.constants.commitversion and vac.constants.scriptversion;
 
 		if (scriptVersion ~= vac.constants.scriptversion) then
 			vac.log('a new version of the script is available', 2, Color3.fromRGB(255, 165, 0));
 			vac.log('execute "reexec" to get the latest script', 2, Color3.fromRGB(255, 165, 0));
+
+			usingOutdated = true
 		end;
 	end);
+
+	task.spawn(function()
+		if (usingOutdated) then return; end;
+
+		repeat task.wait(180);
+			if (usingOutdated) then break; end;
+	
+			local jsonData = game:HttpGet('https://raw.githubusercontent.com/Iratethisname10/vac/refs/heads/main/version.json');
+			local luaData = vac.decode(jsonData);
+
+			if (scriptVersion ~= luaData.ver) then
+				vac.log('the script has just updated', 2, Color3.fromRGB(255, 165, 0));
+				vac.log('execute "reexec" to get the latest script', 2, Color3.fromRGB(255, 165, 0));
+
+				usingOutdated = true
+				break;
+			end;
+
+			task.wait(500);
+		until not vac;
+	end);
 end;
+
+-- spin bot
+-- fling
+-- float

@@ -7,7 +7,7 @@ if (getgenv().vac) then
 end;
 
 local scriptLoadAt = tick();
-local scriptVersion = 2;
+local scriptVersion = 'pre1';
 local discordCode = 'Gxg42Eshpy';
 
 local cloneref = cloneref or function(inst) return inst; end;

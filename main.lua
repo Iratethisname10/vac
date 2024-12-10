@@ -7,7 +7,7 @@ if (getgenv().vac) then
 end;
 
 local scriptLoadAt = tick();
-local scriptVersion = 'pre1';
+local scriptVersion = '1';
 local discordCode = 'Gxg42Eshpy';
 
 local cloneref = cloneref or function(inst) return inst; end;
@@ -25,15 +25,15 @@ do -- vac funcs
 		if (not name) then return; end;
 		props = typeof(props) == 'table' and props or {};
 
-		local drawing = name == 'Square' or name == 'Line' or name == 'Text' or name == 'Quad' or name == 'Circle' or name == 'Triangle';
-		local obj = drawing and Drawing or Instance;
+		local draw = name == 'Square' or name == 'Line' or name == 'Text' or name == 'Quad' or name == 'Circle' or name == 'Triangle';
+		local obj = draw and Drawing or Instance;
 
 		local inst = obj.new(name);
 		for prop, val in next, props do
 			inst[prop] = val;
 		end;
 
-		table.insert(vac.objects, {obj = inst, drawn = drawing});
+		table.insert(vac.objects, {obj = inst, drawn = draw});
 		return inst;
 	end;
 
@@ -106,7 +106,7 @@ do -- vac funcs
 		end;
 
 		ui.output1.Text = prefix .. ' ' .. text;
-		ui.output1.TextColor3 = color or Color3.new(1, 1, 1);
+		ui.output1.TextColor3 = color or vac.constants.colors.white;
 	end;
 
 	function vac.decode(data)
@@ -136,23 +136,103 @@ do -- vac funcs
 
 		return res;
 	end;
+end;
 
-	getgenv().vac = vac;
+do -- vac debug
+	vac.debug = {};
+
+	function vac.debug.print(data, options)
+		if (not data) then
+			return print('data is nil');
+		end;
+
+		options = typeof(options) == 'table' and options or {};
+
+		if (typeof(data) == 'table') then
+			options.indent = typeof(options.indent) == 'number' and options.indent or 0;
+
+			local indent = string.rep('    ', options.indent);
+
+			for k, v in next, data do
+				local key = tostring(k);
+				if (type(k) == 'string') then
+					key = string.format('[%q]', k);
+				elseif (type(k) == 'number') then
+					key = string.format('[%d]', k);
+				end;
+
+				if (type(v) == 'table') then
+					print(string.format('%s%s = {', indent, key));
+					vac.debug.print(v, {indent = indent + 1});
+					print(string.format('%s},', indent));
+				else
+					local val = tostring(v);
+					if (type(v) == 'string') then
+						val = string.format('%q', v);
+					elseif (type(v) == 'number') then
+						val = string.format('%g', v);
+					end;
+
+					print(string.format('%s%s = %s,', indent, key, val));
+				end;
+			end;
+		elseif (typeof(data) == 'string') then
+			print(data);
+		end;
+	end;
+
+	function vac.debug.executeRaw(url, json)
+		if (not url) then return; end;
+
+		local suc, res = pcall(game.HttpGet, game, url);
+		if (not suc or res:sub(1, 1) == '4' or res:sub(1, 1) == '5') then
+			return '4/5 error', res;
+		end;
+
+		if (json) then return res; end;
+
+		local func, err = loadstring(res);
+		if (not func) then
+			return 'syntax error', err;
+		end;
+
+		func();
+
+		return 'ok';
+	end;
+
+	function vac.debug.getFunc(func, name)
+		if (not func) then
+			vac.log(string.format('missing function "%s"', tostring(name)), 1, vac.constants.colors.yellow);
+			return false;
+		end;
+
+		return true;
+	end;
 end;
 
 do -- vac store
 	vac.constants = {};
+	vac.constants.colors = {};
+
+	vac.game = {};
 	vac.temp = {};
+
 	vac.saves = {};
+	vac.scriptsaves = {};
+	vac.globalsaves = {};
 
 	local rng = Random.new(tick() / math.cos(21 * (math.sqrt(2)) + 3));
 	vac.constants.rng = rng;
 	vac.constants.randomnumber = rng:NextInteger(7, 10e5);
 
-	vac.constants.player = players.LocalPlayer;
-	vac.constants.mouse = vac.constants.player:GetMouse();
+	vac.game.me = players.LocalPlayer;
+	vac.game.mouse = players.LocalPlayer:GetMouse();
 
-	vac.constants.cam = workspace.CurrentCamera;
+	vac.game.cam = workspace.CurrentCamera;
+
+	vac.game.id = game.PlaceId;
+	vac.game.job = game.JobId;
 
 	task.spawn(function()
 		local jsonData = game:HttpGet('https://api.github.com/repos/Iratethisname10/vac/commits?path=main.lua');
@@ -168,8 +248,12 @@ do -- vac store
 		vac.constants.scriptversion = luaData.ver;
 	end);
 
-	vac.constants.gameId = game.PlaceId;
-	vac.constants.jobId = game.JobId;
+	vac.constants.colors.black = Color3.fromRGB(0, 0, 0);
+	vac.constants.colors.white = Color3.fromRGB(255, 255, 255);
+	vac.constants.colors.red = Color3.fromRGB(255, 0, 0);
+	vac.constants.colors.orange = Color3.fromRGB(255, 165, 0);
+	vac.constants.colors.yellow = Color3.fromRGB(239, 255, 60);
+	vac.constants.colors.green = Color3.fromRGB(0, 255, 0);
 
 	vac.temp.flyspeed = 50;
 	vac.temp.speedspeed = 50;
@@ -268,8 +352,8 @@ do -- ui
 		PlaceholderText = '...',
 		Text = '',
 		TextWrapped = true,
-		TextColor3 = Color3.fromRGB(255,255,255),
-		PlaceholderColor3 = Color3.fromRGB(255,255,255),
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		PlaceholderColor3 = Color3.fromRGB(255, 255, 255),
 		TextSize = 14,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		ClearTextOnFocus = false,
@@ -343,8 +427,34 @@ do -- ui
 
 		ui.cmdsLayout = vac.create('UIListLayout', {
 			SortOrder = Enum.SortOrder.LayoutOrder,
-			Padding = UDim.new(0, 0),
+			Padding = UDim.new(0, -5),
 			Parent = ui.cmdsContentHolder
+		});
+
+		ui.cmdsDescriptionHolder = vac.create('Frame', {
+			BackgroundColor3 = Color3.new(0.117647, 0.117647, 0.117647),
+			BorderSizePixel = 0,
+			Position = UDim2.new(-0.0152380951, -1, 0.965582669, 0),
+			Size = UDim2.new(0, 454, 0, 38),
+			Parent = ui.cmdsHolder
+		});
+
+		ui.cmdsDescription = vac.create('TextLabel', {
+			BackgroundTransparency = 1,
+			Size = UDim2.new(0, 445, 0, 36),
+			Font = Enum.Font.Code,
+			Text = '',
+			TextColor3 = Color3.fromRGB(255, 255, 255),
+			TextSize = 16,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			Parent = ui.cmdsDescriptionHolder
+		});
+
+		vac.create('UIPadding', {
+			PaddingLeft = UDim.new(0, 10),
+			PaddingRight = UDim.new(0, 10),
+			Parent = ui.cmdsDescription
 		});
 
 		vac.allowDraw(ui.cmdsHolder);
@@ -362,22 +472,13 @@ end;
 
 do -- connections
 	local inputs = {
-		Insert = function()
-			ui.holder.Visible = not ui.holder.Visible;
-			ui.outputHolder.Visible = not ui.outputHolder.Visible;
-
-			if (ui.cmdsHolder.Visible or ui.cmdsContentHolder.Visible) then
-				ui.cmdsHolder.Visible = false;
-				ui.cmdsContentHolder.Visible = false;
-			end;
-		end,
-		Semicolon = function()
+		semicolon = function()
 			ui.commandLine:CaptureFocus();
 			runService.RenderStepped:Wait();
 
 			ui.commandLine.Text = '';
 		end,
-		Tab = function()
+		tab = function()
 			if (not ui.commandLine:IsFocused()) then return; end;
 			if (ui.commandSuggestion.Text == '') then return; end;
 
@@ -389,10 +490,20 @@ do -- connections
 		end
 	};
 
-	vac.connect(inputService.InputBegan, function(input, gpe)
-		local code = input.KeyCode.Name;
-		if (not inputs[code]) then return; end;
+	vac.connect(inputService.InputBegan, function(input)
+		local code = input.KeyCode.Name:lower();
 
+		if (code == vac.scriptsaves.uikeybind) then
+			ui.holder.Visible = not ui.holder.Visible;
+			ui.outputHolder.Visible = not ui.outputHolder.Visible;
+
+			if (ui.cmdsHolder.Visible or ui.cmdsContentHolder.Visible) then
+				ui.cmdsHolder.Visible = false;
+				ui.cmdsContentHolder.Visible = false;
+			end;
+		end;
+
+		if (not inputs[code]) then return; end;
 		inputs[code]();
 	end);
 
@@ -426,7 +537,7 @@ do -- connections
 			return #a.name < #b.name;
 		end);
 
-		for _, v in ipairs(sorted) do
+		for _, v in next, sorted do
 			if (v.name:sub(1, #input) == input) then
 				ui.commandSuggestion.Text = v.name;
 				return;
@@ -472,8 +583,8 @@ do -- command base
 		if (suc) then return; end;
 
 		local err = res:match(':%d+: (.+)') or '???';
-		vac.log(string.format('execution error in command "%s":', command, err), 2, Color3.fromRGB(255, 0, 0));
-		vac.log('    ' .. err, 2, Color3.fromRGB(255, 0, 0));
+		vac.log(string.format('execution error in command "%s":', command), 2, vac.constants.colors.red);
+		vac.log(err, 2, vac.constants.colors.red);
 	end;
 
 	function commands.register(name, func, aliases)
@@ -485,33 +596,67 @@ do -- command base
 end;
 
 do -- file system
-	if (not isfolder('vocatsadmin')) then
-		makefolder('vocatsadmin');
-	end;
+	if (not isfolder('vocatsadmin')) then makefolder('vocatsadmin'); end;
 
-	local file = string.format('vocatsadmin/%s.json', vac.constants.gameId);
+	if (not isfolder('vocatsadmin/cache')) then makefolder('vocatsadmin/cache'); end;
+	if (not isfolder('vocatsadmin/saves')) then makefolder('vocatsadmin/saves'); end;
+
+	if (not isfile('vocatsadmin/saves/_script.json')) then writefile('vocatsadmin/saves/_script.json', '[]'); end; -- script settings; keybind
+	if (not isfile('vocatsadmin/saves/_global.json')) then writefile('vocatsadmin/saves/_global.json', '[]'); end; -- global configs / waypoints
+
+	local file = string.format('vocatsadmin/saves/%s.json', vac.game.id);
 
 	if (not isfile(file)) then
 		writefile(file, '[]');
 	end;
 
-	function vac.updateSaves()
-		writefile(file, vac.encode(vac.saves));
+	function vac.updateSaves(where)
+		if (where == 'script') then
+			writefile('vocatsadmin/saves/_script.json', vac.encode(vac.scriptsaves));
+		elseif (where == 'global') then
+			writefile('vocatsadmin/saves/_global.json', vac.encode(vac.globalsaves));
+		else
+			writefile(file, vac.encode(vac.saves));
+		end
 	end;
 
-	local done = false;
+	local savesDone, scriptSavesDone, globalSavesDone = false, false, false;
 	task.spawn(function()
 		local jsonData = readfile(file);
-		if (not jsonData) then done = true; return; end;
+		if (not jsonData) then savesDone = true; return; end;
 
 		local luaData = vac.decode(jsonData);
 
 		vac.saves.waypoints = luaData.waypoints or {};
 
-		done = true;
+		savesDone = true;
 	end);
 
-	repeat task.wait(); until done;
+	task.spawn(function()
+		local jsonData = readfile('vocatsadmin/saves/_script.json');
+		if (not jsonData) then scriptSavesDone = true; return; end;
+
+		local luaData = vac.decode(jsonData);
+
+		vac.scriptsaves.uikeybind = luaData.uikeybind or 'insert';
+
+		scriptSavesDone = true;
+	end);
+
+	--[[
+		task.spawn(function()
+			local jsonData = readfile('vocatsadmin/saves/_global.json');
+			if (not jsonData) then globalSavesDone = true; return; end;
+
+			local luaData = vac.decode(jsonData);
+
+			vac.saves.waypoints = luaData.waypoints or {};
+
+			globalSavesDone = true;
+		end);
+	]]
+
+	repeat task.wait(); until savesDone and scriptSavesDone; --[[ and globalSavesDone]]
 end;
 
 do -- script funcs
@@ -519,8 +664,8 @@ do -- script funcs
 	vac.funcs = {};
 
 	local funcs, utils, temp = vac.funcs, vac.utilfuncs, vac.temp;
-	local lplr = vac.constants.player;
-	local cam = vac.constants.cam;
+	local lplr = vac.game.me;
+	local cam = vac.game.cam;
 
 	local actionService = cloneref(game:GetService('ContextActionService'));
 
@@ -538,7 +683,9 @@ do -- script funcs
 	function utils.getPlayer(name, includeAll)
 		if (name:len() < 1) then return nil; end;
 
-		if (name == 'random') then
+		if (name == 'me') then
+			return lplr;
+		elseif (name == 'random') then
 			return players:GetPlayers()[vac.constants.rng:NextInteger(2, #players:GetPlayers())];
 		elseif (name == 'all' and includeAll) then
 			local returns = {};
@@ -569,6 +716,10 @@ do -- script funcs
 		if (not hum) then return nil; end;
 
 		return hum;
+	end;
+
+	function utils.getBoth()
+		return utils.getRoot(), utils.getHum();
 	end;
 
 	function funcs.fly(toggle, cframe, vfly)
@@ -629,12 +780,12 @@ do -- script funcs
 				root.AssemblyLinearVelocity = Vector3.zero;
 				root.AssemblyAngularVelocity = Vector3.zero;
 
-				root.CFrame += Vector3.new(moveDir.X, temp.flyvertical, moveDir.Z) * temp.flyspeed * dt;
+				root.CFrame += Vector3.new(moveDir.X, temp.flyvertical, moveDir.Z) * temp.flyspeed * dt + Vector3.new(0, 0.04, 0);
 			else
 				if (vfly) then
 					utils.getMovePart().AssemblyLinearVelocity = Vector3.new(moveDir.X, temp.flyvertical, moveDir.Z) * temp.flyspeed;
 				else
-					root.AssemblyLinearVelocity = Vector3.new(moveDir.X, temp.flyvertical, moveDir.Z) * temp.flyspeed;
+					root.AssemblyLinearVelocity = Vector3.new(moveDir.X, temp.flyvertical, moveDir.Z) * temp.flyspeed + Vector3.new(0, 2.25, 0);
 				end;
 			end;
 		end);
@@ -731,7 +882,7 @@ do -- script funcs
 		function funcs.rwInit()
 			local role = getRoleId();
 			if (not role) then
-				vac.log('role does not exist', 1, Color3.fromRGB(255, 165, 0));
+				vac.log('role does not exist', 1, vac.constants.colors.orange);
 				return;
 			end;
 
@@ -794,6 +945,8 @@ do -- script funcs
 				self._player = player;
 				self._playerName = player.Name;
 
+				self._visible = false;
+
 				self._label = Drawing.new('Text');
 				self._label.Visible = false;
 				self._label.Center = true;
@@ -801,13 +954,13 @@ do -- script funcs
 				self._label.Text = '';
 				self._label.Font = Drawing.Fonts.Plex;
 				self._label.Size = 20;
-				self._label.Color = Color3.fromRGB(255, 255, 255);
+				self._label.Color = vac.constants.colors.white;
 
 				self._box = Drawing.new('Quad');
 				self._box.Visible = false;
 				self._box.Thickness = 1;
 				self._box.Filled = false;
-				self._box.Color = Color3.fromRGB(255, 255, 255);
+				self._box.Color = vac.constants.colors.white;
 
 				return self;
 			end;
@@ -1023,10 +1176,10 @@ do -- script funcs
 			end;
 
 			function input.pan()
-				local localMouse = mouse.Delta * PAN_MOUSE_SPEED;
+				local mousePan = mouse.Delta * PAN_MOUSE_SPEED;
 				mouse.Delta = Vector2.new();
 
-				return localMouse;
+				return mousePan;
 			end;
 
 			local function _keypress(_, state, object)
@@ -1041,8 +1194,8 @@ do -- script funcs
 			end
 
 			local function _zero(tab)
-				for k, x in tab do
-					tab[k] = x * 0;
+				for k, v in tab do
+					tab[k] = v * 0;
 				end;
 			end;
 
@@ -1223,12 +1376,20 @@ do -- script funcs
 		function funcs.cmdsInit()
 			if (ui.cmdsdone) then return; end;
 
+			local numCmds = 1;
+			local sorted = {};
+
 			for i in next, commands.list do
+				table.insert(sorted, i);
+			end;
+			table.sort(sorted);
+
+			for _, v in next, sorted do
 				local label = vac.create('TextLabel', {
 					BackgroundTransparency = 1,
 					Size = UDim2.new(1, -10, 0, 27),
 					Font = Enum.Font.Code,
-					Text = i,
+					Text = string.format('%s) %s', numCmds, v),
 					TextColor3 = Color3.new(1, 1, 1),
 					TextSize = 16,
 					TextXAlignment = Enum.TextXAlignment.Left,
@@ -1242,6 +1403,17 @@ do -- script funcs
 					PaddingRight = UDim.new(0, 10),
 					Parent = label
 				});
+
+				vac.connect(label.MouseEnter, function()
+					ui.cmdsDescription.Text = commands.list[v];
+				end);
+
+				vac.connect(label.MouseLeave, function()
+					if (ui.cmdsDescription.Text ~= commands.list[v]) then return; end;
+					ui.cmdsDescription.Text = '';
+				end);
+
+				numCmds += 1;
 			end;
 
 			local contentSize = ui.cmdsLayout.AbsoluteContentSize;
@@ -1258,11 +1430,14 @@ do -- commands list
 
 	list['eject'] = 'fully unloades the script';
 	list['discord'] = 'joins the discord sever and copies it to your clipboard';
+	list['rebindui [key]'] = 'lets you rebind the ui\'s toggle key';
 	list['checkversion / checkver'] = 'checks the script version';
 	list['reexecute / reexec'] = 'executes the latest version of the script';
 	list['commands / cmds'] = 'shows a list of commands';
 	list['rejoin / rj'] = 'rejoins the server';
 	list['serverhop / sh / shop'] = 'joins another server';
+	list['autorejoin / autorj'] = 'rejoins the server when you get kicked';
+	list['unautorejoin / unautorj / noautorejoin / noautorj'] = 'disables auto rejoin';
 	list['walkspeed / ws [speed?]'] = 'changes your walkspeed';
 	list['loopwalkspeed / loopspeed / loopws / lws [speed?]'] = 'loops your walkspeed';
 	list['unloopwalkspeed / unloopspeed/  unloopws / unlws'] = 'unloops your walkspeed';
@@ -1274,7 +1449,7 @@ do -- commands list
 	list['velocityspeed / velospeed / speedvelo [speed?]'] = 'manipulates your velocity to let you go zooooom';
 	list['unspeed / nospeed'] = 'disables speed';
 	list['teleportwalk / tpwalk [speed?]'] = 'shifts your character by the speed set when you walk';
-	list['upteleportwalk / untpwalk'] = 'disables tp walk';
+	list['unteleportwalk / untpwalk'] = 'disables tp walk';
 	list['teleportto / goto / to [player]'] = 'teleports you to someone';
 	list['safeteleportto / safegoto / safeto'] = 'loads the area you are teleporting to before teleporting you';
 	list['inviscam / noclipcam / nccam'] = 'lets your camera noclip';
@@ -1302,6 +1477,7 @@ do -- commands list
 	list['dex'] = 'executes dex';
 	list['remotespy / rspy'] = 'executes simple spy';
 	list['adonisbypass'] = 'bypasses adonis anticheat';
+	list['f3x'] = 'gives you f3x building tools';
 	list['freecam / fc'] = 'lets your camera fly around';
 	list['unfreecam / unfc'] = 'disbales freecam';
 	list['waypoints / wp'] = 'lets you set point you can teleport to';
@@ -1316,29 +1492,32 @@ do -- commands list
 	list['unflyjump / unjetpack'] = 'disables fly jump';
 	list['loopbring [player] [distance?]'] = 'brings players to you';
 	list['unloopbring'] = 'disables loop bring';
-	list['fling'] = 'flings peoplpe';
-	list['unfling / nofling'] = 'stops flinging people';
+	list['clearerror / clearerr / clrerr'] = 'removes the blur and box when you get kicked';
+	list['copyposition / copypos'] = 'copies your position to your clipboard';
+	list['copyvector / copyvec'] = 'copies your positin wrapped in a vector3 constructor';
 end;
 
 do -- commands
-	local lplr = vac.constants.player;
-	local cam = vac.constants.cam;
+	local lplr = vac.game.me;
+	local cam = vac.game.cam;
 
 	local ppService = cloneref(game:GetService('ProximityPromptService'));
 	local tpService = cloneref(game:GetService('TeleportService'));
 	local lightService = cloneref(game:GetService('Lighting'));
+	local uiService = cloneref(game:GetService('GuiService'));
+	local networkClient = cloneref(game:GetService('NetworkClient'));
 
 	commands.register('eject', vac.unload);
 
 	commands.register('discord', function()
 		if (setclipboard) then
 			setclipboard(string.format('https://discord.gg/%s', discordCode));
-			vac.log('server invite has been copied to clipboard', 0);
+			vac.log('server invite copied to clipboard', 0);
 		end;
 
 		if (request) then
 			for i = 6463, 6472 do
-				pcall(function()
+				if (pcall(function()
 					request({
 						Url = string.format('http://127.0.0.1:%s/rpc?v=1', i),
 						Method = 'POST',
@@ -1346,15 +1525,40 @@ do -- commands
 							['Content-Type'] = 'application/json',
 							Origin = 'https://discord.com'
 						},
-						Body = ('{"cmd":"INVITE_BROWSER","args":{"code":"%s"},"nonce":"%s"}'):format(discordCode, string.lower(httpService:GenerateGUID(false)))
+						Body = vac.encode({
+							cmd = 'INVITE_BROWSER',
+							args = {code = discordCode},
+							nonce = httpService:GenerateGUID(false)
+						})
 					});
-				end);
+				end)) then
+					break;
+				end;
 			end;
 
 			return;
 		end;
 
 		vac.log(string.format('discord server: discord.gg/%s', discordCode), 0);
+	end);
+
+	commands.register('rebindui', function(key)
+		local allowedKey = false
+		for _, v in next, Enum.KeyCode:GetEnumItems() do
+			if (v.Name:lower() ~= key:lower()) then continue; end;
+
+			allowedKey = true;
+			break;
+		end;
+
+		if (not allowedKey) then
+			vac.log(string.format('invalid key "%s"', key), 1, vac.constants.colors.orange);
+			return;
+		end;
+
+		vac.scriptsaves.uikeybind = key;
+		vac.updateSaves('script');
+		vac.log(string.format('ui keybind set to "%s"', key:upper()), 0);
 	end);
 
 	commands.register('checkversion', function()
@@ -1369,29 +1573,21 @@ do -- commands
 		vac.log(string.format('server returned version - %s (%s)', scriptVersion, sCommit), 0);
 
 		if (scriptVersion == cVersion and sCommit == cCommit) then
-			vac.log('script is up to date!', 0, Color3.fromRGB(0, 255, 0));
+			vac.log('script is up to date!', 0, vac.constants.colors.green);
 			return;
 		end;
 
-		vac.log('version mismatch', 2, Color3.fromRGB(255, 165, 0));
-		vac.log('execute "reexec" to get the latest script', 2, Color3.fromRGB(255, 165, 0));
+		vac.log('version mismatch', 2, vac.constants.colors.orange);
+		vac.log('execute "reexec" to get the latest script', 2, vac.constants.colors.orange);
 	end, { 'checkver' });
 
 	commands.register('reexecute', function()
 		local url = 'https://raw.githubusercontent.com/Iratethisname10/vac/refs/heads/main/main.lua';
-		local suc, res = pcall(function() return game:HttpGet(url); end);
-		if (not suc or table.find({'404: Not Found', '400: Invalid Request'}, res)) then
-			vac.log('could not reexecute: 4** error', 2, Color3.fromRGB(255, 0, 0));
-			return;
-		end;
+		local res, err = vac.debug.executeRaw(url);
 
-		local fun = loadstring(res, url);
-		if (not fun) then
-			vac.log('could not reexecute: syntax error', 2, Color3.fromRGB(255, 0, 0));
-			return;
+		if (err) then
+			vac.log(string.format('could not re-execute: ', res), 2, vac.constants.colors.red);
 		end;
-
-		fun();
 	end, { 'reexec' });
 
 	commands.register('commands', function()
@@ -1405,27 +1601,56 @@ do -- commands
 		vac.log('rejoining...', 0);
 
 		if (#players:GetPlayers() <= 1) then
-			tpService:Teleport(vac.constants.gameId, lplr);
+			tpService:Teleport(vac.game.id, lplr);
 			return;
 		end;
 
-		tpService:TeleportToPlaceInstance(vac.constants.gameId, vac.constants.jobId, lplr);
+		tpService:TeleportToPlaceInstance(vac.game.id, vac.game.job, lplr);
 	end, { 'rj' });
 
 	commands.register('serverhop', function()
-		vac.log('finding server...', 0);
+		if (not vac.temp.serverhoppointer) then
+			vac.log('finding server...', 0);
+		end;
 
-		local data = vac.decode(game:HttpGet(string.format('https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Desc&limit=100', vac.constants.gameId))).data;
+		local data = vac.decode(game:HttpGet(string.format('https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Desc&limit=100%s', vac.game.id, vac.temp.serverhoppointer and '&cursor=' .. vac.temp.serverhoppointer or ''))).data;
 		for _, v in next, data do
-			if (v.playing >= v.maxPlayers or v.id == vac.constants.jobId) then continue; end;
+			if (v.playing >= v.maxPlayers or v.id == vac.game.job or v.ping > 300) then continue; end;
 
-			vac.log('found server!', 0, Color3.fromRGB(0, 255, 0));
-			tpService:TeleportToPlaceInstance(vac.constants.gameId, v.id, vac.constants.player);
+			vac.log('found server!', 0, vac.constants.colors.green);
+			tpService:TeleportToPlaceInstance(vac.game.id, v.id, lplr);
 			return;
 		end;
 
-		vac.log('could not find a server', 1, Color3.fromRGB(255, 165, 0));
+		if (data.nextPageCursor) then
+			vac.temp.serverhoppointer = data.nextPageCursor;
+			commands.execute('serverhop');
+			return;
+		end;
+
+		vac.temp.serverhoppointer = nil;
+		vac.log('could not find a server', 1, vac.constants.colors.orange);
 	end, { 'sh', 'shop' });
+
+	commands.register('autorejoin', function()
+		if (not networkClient:FindFirstChild('ClientReplicator')) then
+			commands.execute('rejoin');
+		end;
+
+		commands.execute('unautorejoin');
+
+		vac.temp.autorj = vac.connect(networkClient.ChildRemoved, function(inst)
+			if (not inst:IsA('ClientReplicator')) then return; end;
+			commands.execute('rejoin');
+		end);
+	end, { 'autorj' });
+
+	commands.register('unautorejoin', function()
+		if (vac.temp.autorj) then
+			vac.temp.autorj:Disconnect();
+			vac.temp.autorj = nil;
+		end;
+	end, { 'unautorj', 'noautorejoin', 'noautorj' });
 
 	commands.register('walkspeed', function(speed)
 		local hum = lplr.Character and lplr.Character:FindFirstChildOfClass('Humanoid');
@@ -1462,17 +1687,17 @@ do -- commands
 	end, { 'unloopspeed', 'unloopws', 'unlws' });
 
 	commands.register('fly', function(speed)
-		if (speed) then vac.temp.flyspeed = tonumber(speed) or 50; end;
+		if (tonumber(speed)) then vac.temp.flyspeed = speed; end;
 		vac.funcs.fly(true, true, false);
 	end);
 
 	commands.register('velocityfly', function(speed)
-		if (speed) then vac.temp.flyspeed = tonumber(speed) or 50; end;
+		if (tonumber(speed)) then vac.temp.flyspeed = speed; end;
 		vac.funcs.fly(true, false, false);
 	end, { 'velofly', 'flyvelo' });
 
 	commands.register('vehiclefly', function(speed)
-		if (speed) then vac.temp.flyspeed = tonumber(speed) or 50; end;
+		if (tonumber(speed)) then vac.temp.flyspeed = speed; end;
 		vac.funcs.fly(true, false, true);
 	end, { 'vfly' });
 
@@ -1481,12 +1706,12 @@ do -- commands
 	end, { 'unvehiclefly', 'unvfly' });
 
 	commands.register('speed', function(speed)
-		if (speed) then vac.temp.speedspeed = tonumber(speed) or 50; end;
+		if (tonumber(speed)) then vac.temp.speedspeed = speed; end;
 		vac.funcs.speed(true, true);
 	end);
 
 	commands.register('velocityspeed', function(speed)
-		if (speed) then vac.temp.speedspeed = tonumber(speed) or 50; end;
+		if (tonumber(speed)) then vac.temp.speedspeed = speed; end;
 		vac.funcs.speed(true, false);
 	end, { 'velospeed', 'speedvelo' });
 
@@ -1495,11 +1720,10 @@ do -- commands
 	end, { 'nospeed' });
 
 	commands.register('teleportwalk', function(speed)
-		commands.execute('upteleportwalk');
+		commands.execute('unteleportwalk');
 
 		vac.temp.tpwalk = vac.connect(runService.Heartbeat, function(dt)
-			local root = vac.utilfuncs.getRoot();
-			local hum = vac.utilfuncs.getHum();
+			local root, hum = vac.utilfuncs.getBoth();
 			if (not root or not hum) then return; end;
 
 			local dir = hum.MoveDirection;
@@ -1509,7 +1733,7 @@ do -- commands
 		end);
 	end, { 'tpwalk' });
 
-	commands.register('upteleportwalk', function()
+	commands.register('unteleportwalk', function()
 		if (vac.temp.tpwalk) then
 			vac.temp.tpwalk:Disconnect();
 			vac.temp.tpwalk = nil;
@@ -1521,10 +1745,10 @@ do -- commands
 		if (not player) then return; end;
 
 		local otherRoot = player.Character and player.Character.PrimaryPart;
-		local root = vac.utilfuncs.getRoot();
-		if (not root or not otherRoot) then return; end;
+		local localRoot = vac.utilfuncs.getRoot();
+		if (not localRoot or not otherRoot) then return; end;
 
-		root.CFrame = otherRoot.CFrame;
+		localRoot.CFrame = otherRoot.CFrame;
 	end, { 'goto', 'to' });
 
 	commands.register('safeteleportto', function(player)
@@ -1532,8 +1756,8 @@ do -- commands
 		if (not player) then return; end;
 
 		local otherRoot = player.Character and player.Character.PrimaryPart;
-		local root = vac.utilfuncs.getRoot();
-		if (not root or not otherRoot) then return; end;
+		local localRoot = vac.utilfuncs.getRoot();
+		if (not localRoot or not otherRoot) then return; end;
 
 		local beenASecond = false;
 		task.delay(1, function() beenASecond = true end);
@@ -1541,13 +1765,13 @@ do -- commands
 		task.spawn(function()
 			while (not beenASecond) do
 				lplr:RequestStreamAroundAsync(otherRoot.CFrame.Position, 0.3);
-				root.AssemblyLinearVelocity = Vector3.zero;
-				root.AssemblyAngularVelocity = Vector3.zero;
+				localRoot.AssemblyLinearVelocity = Vector3.zero;
+				localRoot.AssemblyAngularVelocity = Vector3.zero;
 				task.wait();
 			end;
 		end);
 
-		root.CFrame = otherRoot.CFrame;
+		localRoot.CFrame = otherRoot.CFrame;
 	end, { 'safegoto', 'safeto' });
 
 	commands.register('inviscam', function()
@@ -1616,6 +1840,8 @@ do -- commands
 	end, { 'fov' });
 
 	commands.register('loopfieldofview', function(fov)
+		commands.execute('unloopfieldofview');
+
 		if (not fov) then return; end;
 
 		vac.temp.loopfov = true;
@@ -1641,7 +1867,6 @@ do -- commands
 	commands.register('stoprolewatch', function()
 		vac.temp.rolewatch.group = nil;
 		vac.temp.rolewatch.role = nil;
-		vac.temp.rolewatch.action = nil;
 
 		if (vac.temp.rolewatch.loop) then
 			vac.temp.rolewatch.loop:Disconnect();
@@ -1697,7 +1922,7 @@ do -- commands
 	end, { 'unloopfb', 'unlfb' });
 
 	commands.register('grabtools', function()
-		local hum = lplr.Character and lplr.Character:FindFirstChildOfClass('Humanoid');
+		local hum = vac.utilfuncs.getHum();
 		if (not hum) then return; end;
 
 		for _, v in next, workspace:GetChildren() do
@@ -1715,15 +1940,34 @@ do -- commands
 	end, { 'unesp' });
 
 	commands.register('dex', function()
-		loadstring(game:HttpGet('https://raw.githubusercontent.com/infyiff/backup/main/dex.lua'))();
+		local url = 'https://raw.githubusercontent.com/infyiff/backup/main/dex.lua';
+		local res, err = vac.debug.executeRaw(url);
+
+		if (err) then
+			vac.log(string.format('could not execute dex: ', res), 2, vac.constants.colors.red);
+		end;
 	end);
 
 	commands.register('remotespy', function()
-		loadstring(game:HttpGet('https://raw.githubusercontent.com/infyiff/backup/main/SimpleSpyV3/main.lua'))();
+		local url = 'https://raw.githubusercontent.com/infyiff/backup/main/SimpleSpyV3/main.lua';
+		local res, err = vac.debug.executeRaw(url);
+
+		if (err) then
+			vac.log(string.format('could not execute rspy: ', res), 2, vac.constants.colors.red);
+		end;
 	end, { 'rspy' });
 
 	commands.register('adonisbypass', function()
-		loadstring(game:HttpGet('https://raw.githubusercontent.com/Pixeluted/adoniscries/main/Source.lua'))();
+		local url = 'https://raw.githubusercontent.com/Pixeluted/adoniscries/main/Source.lua';
+		local res, err = vac.debug.executeRaw(url);
+
+		if (err) then
+			vac.log(string.format('could not execute adonisbypass: ', res), 2, vac.constants.colors.red);
+		end;
+	end);
+
+	commands.register('f3x', function()
+		loadstring(game:GetObjects('rbxassetid://6695644299')[1].Source)();
 	end);
 
 	commands.register('freecam', function(speed)
@@ -1860,7 +2104,7 @@ do -- commands
 			if (not vac.temp.airjumpallow) then return; end;
 			vac.temp.airjumpallow = false;
 
-			local hum = lplr.Character and lplr.Character:FindFirstChildOfClass('Humanoid');
+			local hum = vac.utilfuncs.getHum();
 			if (not hum) then return; end;
 
 			hum:ChangeState(Enum.HumanoidStateType.Jumping);
@@ -1949,20 +2193,44 @@ do -- commands
 	commands.register('unloopbring', function()
 		vac.temp.loopbringing = false;
 	end);
+
+	commands.register('clearerror', function()
+		uiService:ClearError();
+	end, { 'clearerr', 'clrerr' });
+
+	commands.register('copyposition', function()
+		local root = vac.utilfuncs.getRoot();
+		if (not root) then return; end;
+
+		if (not vac.debug.getFunc(setclipboard, 'setclipboard')) then return; end;
+
+		local postion = root.CFrame.Position;
+		setclipboard(string.format('%s, %s, %s', math.round(postion.X), math.round(postion.Y), math.round(postion.Z)));
+	end, { 'copypos' });
+
+	commands.register('copyvector', function()
+		local root = vac.utilfuncs.getRoot();
+		if (not root) then return; end;
+
+		if (not vac.debug.getFunc(setclipboard, 'setclipboard')) then return; end;
+
+		local postion = root.CFrame.Position;
+		setclipboard(string.format('Vector3.new(%s, %s, %s)', math.round(postion.X), math.round(postion.Y), math.round(postion.Z)));
+	end, { 'copyvec' });
 end;
 
 do -- end
-	vac.log(string.format('loaded in %.02f seconds', tick() - scriptLoadAt), 0, Color3.fromRGB(0, 255, 0));
-	vac.log('click insert to toggle the ui', 0);
+	vac.log(string.format('loaded in %.02f seconds', tick() - scriptLoadAt), 0, vac.constants.colors.green);
+	vac.log(string.format('click %s to toggle the ui', vac.scriptsaves.uikeybind), 0);
 
 	local usingOutdated = false;
 
 	task.spawn(function()
-		repeat task.wait(); until vac.constants.commitversion and vac.constants.scriptversion;
+		repeat task.wait(); until vac.constants.scriptversion;
 
 		if (scriptVersion ~= vac.constants.scriptversion) then
-			vac.log('a new version of the script is available', 2, Color3.fromRGB(255, 165, 0));
-			vac.log('execute "reexec" to get the latest script', 2, Color3.fromRGB(255, 165, 0));
+			vac.log('a new version of the script is available', 2, vac.constants.colors.orange);
+			vac.log('execute "reexec" to get the latest script', 2, vac.constants.colors.orange);
 
 			usingOutdated = true
 		end;
@@ -1973,13 +2241,13 @@ do -- end
 
 		repeat task.wait(180);
 			if (usingOutdated) then break; end;
-	
+
 			local jsonData = game:HttpGet('https://raw.githubusercontent.com/Iratethisname10/vac/refs/heads/main/version.json');
 			local luaData = vac.decode(jsonData);
 
 			if (scriptVersion ~= luaData.ver) then
-				vac.log('the script has just updated', 2, Color3.fromRGB(255, 165, 0));
-				vac.log('execute "reexec" to get the latest script', 2, Color3.fromRGB(255, 165, 0));
+				vac.log('the script has just updated', 2, vac.constants.colors.orange);
+				vac.log('execute "reexec" to get the latest script', 2, vac.constants.colors.orange);
 
 				usingOutdated = true
 				break;
@@ -1988,8 +2256,6 @@ do -- end
 			task.wait(500);
 		until not vac;
 	end);
-end;
 
--- spin bot
--- fling
--- float
+	getgenv().vac = vac;
+end;

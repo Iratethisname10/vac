@@ -7,7 +7,7 @@ if (getgenv().vac) then
 end;
 
 local scriptLoadAt = tick();
-local scriptVersion = 1;
+local scriptVersion = 2;
 local discordCode = 'Gxg42Eshpy';
 
 local cloneref = cloneref or function(inst) return inst; end;
@@ -163,7 +163,7 @@ do -- vac debug
 
 				if (type(v) == 'table') then
 					print(string.format('%s%s = {', indent, key));
-					vac.debug.print(v, {indent = indent + 1});
+					vac.debug.print(v, {indent = options.indent + 1});
 					print(string.format('%s},', indent));
 				else
 					local val = tostring(v);
@@ -582,7 +582,7 @@ do -- command base
 		local suc, res = pcall(cmd.func, ...);
 		if (suc) then return; end;
 
-		local err = res:match(':%d+: (.+)') or '???';
+		local err = res:match(':%d+: .+') or '???';
 		vac.log(string.format('execution error in command "%s":', command), 2, vac.constants.colors.red);
 		vac.log(err, 2, vac.constants.colors.red);
 	end;
@@ -628,6 +628,7 @@ do -- file system
 		local luaData = vac.decode(jsonData);
 
 		vac.saves.waypoints = luaData.waypoints or {};
+		vac.saves.configs = luaData.configs or {};
 
 		savesDone = true;
 	end);
@@ -1422,6 +1423,62 @@ do -- script funcs
 			ui.cmdsdone = true;
 		end;
 	end;
+
+	do -- configs
+		local function checkValid(name)
+			if (not vac.saves.configs[name]) then
+				vac.log(string.format('config "%s" does not exist', name), 1, vac.constants.colors.orange);
+				return false;
+			end;
+
+			return true;
+		end;
+
+		function funcs.saveConfig(name, module)
+			if (not commands.findCommand(module)) then
+				vac.log(string.format('"%s" is not a valid command', module), 1, vac.constants.colors.orange);
+				return;
+			end;
+
+			vac.log(string.format('saved "%s" to config "%s"', module, name), 0);
+
+			vac.saves.configs[name] = vac.saves.configs[name] or {};
+			table.insert(vac.saves.configs[name], module);
+			vac.updateSaves();
+		end;
+
+		function funcs.loadConfig(name)
+			if (not checkValid(name)) then return; end;
+
+			for _, v in next, vac.saves.configs[name] do
+				commands.execute(v);
+			end;
+
+			vac.log(string.format('loaded config "%s"', name), 0);
+		end;
+
+		function funcs.deleteConfig(name)
+			if (not checkValid(name)) then return; end;
+
+			vac.saves.configs[name] = nil;
+			vac.updateSaves();
+
+			vac.log(string.format('config "%s" has been deleted', name), 0);
+		end;
+
+		function funcs.renameConfig(name, newname)
+			if (not checkValid(name)) then return; end;
+
+			local temp = vac.saves.configs[name];
+			vac.saves.configs[newname] = temp;
+			vac.saves.configs[name] = nil;
+
+			vac.updateSaves();
+			temp = nil;
+
+			vac.log(string.format('config "%s" has been renamed to "%s"', name, newname), 0);
+		end;
+	end;
 end;
 
 do -- commands list
@@ -1495,6 +1552,12 @@ do -- commands list
 	list['clearerror / clearerr / clrerr'] = 'removes the blur and box when you get kicked';
 	list['copyposition / copypos'] = 'copies your position to your clipboard';
 	list['copyvector / copyvec'] = 'copies your positin wrapped in a vector3 constructor';
+	list['nobloom'] = 'removes and bloom effects in lighting';
+	list['noblur'] = 'removes and blur effects in lighting';
+	list['configsave [name] [module]'] = 'lets you save a group of modules for easy execution';
+	list['configload [name]'] = 'executes all commands in the provided group';
+	list['configdelete [name]'] = 'deletes a config';
+	list['configrename [name] [newname]'] = 'renames a config to newname';
 end;
 
 do -- commands
@@ -2206,6 +2269,7 @@ do -- commands
 
 		local postion = root.CFrame.Position;
 		setclipboard(string.format('%s, %s, %s', math.round(postion.X), math.round(postion.Y), math.round(postion.Z)));
+		vac.log('postion copied to clipboard', 0);
 	end, { 'copypos' });
 
 	commands.register('copyvector', function()
@@ -2216,11 +2280,46 @@ do -- commands
 
 		local postion = root.CFrame.Position;
 		setclipboard(string.format('Vector3.new(%s, %s, %s)', math.round(postion.X), math.round(postion.Y), math.round(postion.Z)));
+		vac.log('postion copied to clipboard', 0);
 	end, { 'copyvec' });
+
+	commands.register('nobloom', function()
+		for _, v in next, lightService:GetChildren() do
+			if (not v:IsA('BloomEffect')) then continue; end;
+			v.Enabled = false;
+		end;
+	end);
+
+	commands.register('noblur', function()
+		for _, v in next, lightService:GetChildren() do
+			if (not v:IsA('BlurEffect')) then continue; end;
+			v.Enabled = false;
+		end;
+	end);
+
+	commands.register('configsave', function(name, module)
+		if (not name or not module) then return; end;
+		vac.funcs.saveConfig(name, module);
+	end);
+
+	commands.register('configload', function(name)
+		if (not name) then return; end;
+		vac.funcs.loadConfig(name);
+	end);
+
+	commands.register('configdelete', function(name)
+		if (not name) then return; end;
+		vac.funcs.deleteConfig(name);
+	end);
+
+	commands.register('configrename', function(name, newname)
+		if (not name or not newname) then return; end;
+		vac.funcs.renameConfig(name, newname);
+	end);
 end;
 
 do -- end
-	vac.log(string.format('loaded in %.02f seconds', tick() - scriptLoadAt), 0, vac.constants.colors.green);
+	vac.log(string.format('loaded in %.02f seconds!', tick() - scriptLoadAt), 0, vac.constants.colors.green);
 	vac.log(string.format('click %s to toggle the ui', vac.scriptsaves.uikeybind), 0);
 
 	local usingOutdated = false;

@@ -1485,80 +1485,6 @@ do -- script funcs
 			vac.log(string.format('config "%s" has been renamed to "%s"', name, newname), 0);
 		end;
 	end;
-
-	do -- anti fling
-		local moddedParts = {};
-		local connections = {};
-
-		local function onPlayerAdded(player)
-			if (player == lplr) then return; end;
-
-			if (not player.Character) then
-				player.CharacterAdded:Wait();
-			end;
-
-			local function antiFling()
-				for _, v in next, player.Character:GetDescendants() do
-					if (not v:IsA('BasePart')) then continue; end;
-					v.CanCollide = false;
-					moddedParts[v] = true;
-				end;
-			end;
-
-			connections[player] = vac.connect(player.CharacterAdded, antiFling);
-
-			antiFling();
-		end;
-
-		local function onPlayerRemoving(player)
-			if (player == lplr or not player.Character) then return; end;
-
-			if (connections[player]) then
-				connections[player]:Disconnect();
-				connections[player] = nil;
-			end;
-
-			for _, v in next, player.Character:GetDescendants() do
-				if (not v:IsA('BasePart')) then continue; end;
-				if (not moddedParts[v]) then continue; end;
-				moddedParts[v] = nil;
-			end;
-		end;
-
-		function funcs.afInit()
-			temp.afAdded = vac.connect(players.PlayerAdded, onPlayerAdded);
-			temp.afRemoved = vac.connect(players.PlayerRemoving, onPlayerRemoving);
-
-			for _, v in next, players:GetPlayers() do
-				task.spawn(onPlayerAdded, v);
-			end;
-		end;
-
-		function funcs.afRevert()
-			if (temp.afAdded) then
-				temp.afAdded:Disconnect();
-				temp.afAdded = nil;
-			end;
-
-			for _, v in next, connections do
-				if (not v) then continue; end;
-				v:Disconnect();
-				v = nil;
-			end;
-
-			if (temp.afRemoved) then
-				temp.afRemoved:Disconnect();
-				temp.afRemoved = nil;
-			end;
-
-			for i in next, moddedParts do
-				if (not i or i.CanCollide) then continue; end;
-				i.CanCollide = true;
-			end;
-
-			table.clear(moddedParts);
-		end;
-	end;
 end;
 
 do -- commands list
@@ -2498,11 +2424,24 @@ do -- commands
 
 	commands.register('antifling', function()
 		commands.execute('unantifling');
-		vac.funcs.afInit();
+
+		vac.temp.antifling = vac.connect(runService.Heartbeat, function()
+			for _, v in next, players:GetPlayers() do
+				if (v == lplr or not v.Character) then continue; end;
+
+				for _, v2 in next, v.Character:GetDescendants() do
+					if (not v2:IsA('BasePart') or not v2.CanCollide) then continue; end;
+					v2.CanCollide = false;
+				end;
+			end;
+		end);
 	end);
 
 	commands.register('unantifling', function()
-		vac.funcs.afRevert();
+		if (vac.temp.antifling) then
+			vac.temp.antifling:Disconnect();
+			vac.temp.antifling = nil;
+		end;
 	end);
 
 	commands.register('friend', function(player)

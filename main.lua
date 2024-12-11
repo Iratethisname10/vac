@@ -1488,6 +1488,7 @@ do -- script funcs
 
 	do -- anti fling
 		local moddedParts = {};
+		local connections = {};
 
 		local function onPlayerAdded(player)
 			if (player == lplr) then return; end;
@@ -1496,15 +1497,26 @@ do -- script funcs
 				player.CharacterAdded:Wait();
 			end;
 
-			for _, v in next, player.Character:GetDescendants() do
-				if (not v:IsA('BasePart')) then continue; end;
-				v.CanCollide = false;
-				moddedParts[v] = true;
+			local function antiFling()
+				for _, v in next, player.Character:GetDescendants() do
+					if (not v:IsA('BasePart')) then continue; end;
+					v.CanCollide = false;
+					moddedParts[v] = true;
+				end;
 			end;
+
+			connections[player] = vac.connect(player.CharacterAdded, antiFling);
+
+			antiFling();
 		end;
 
 		local function onPlayerRemoving(player)
 			if (player == lplr or not player.Character) then return; end;
+
+			if (connections[player]) then
+				connections[player]:Disconnect();
+				connections[player] = nil;
+			end;
 
 			for _, v in next, player.Character:GetDescendants() do
 				if (not v:IsA('BasePart')) then continue; end;
@@ -1528,14 +1540,20 @@ do -- script funcs
 				temp.afAdded = nil;
 			end;
 
+			for _, v in next, connections do
+				if (not v) then continue; end;
+				v:Disconnect();
+				v = nil;
+			end;
+
 			if (temp.afRemoved) then
 				temp.afRemoved:Disconnect();
 				temp.afRemoved = nil;
 			end;
 
-			for _, v in next, moddedParts do
-				if (not v or v.CanCollide) then continue; end;
-				v.CanCollide = true;
+			for i in next, moddedParts do
+				if (not i or i.CanCollide) then continue; end;
+				i.CanCollide = true;
 			end;
 
 			table.clear(moddedParts);

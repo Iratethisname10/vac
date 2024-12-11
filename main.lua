@@ -7,7 +7,7 @@ if (getgenv().vac) then
 end;
 
 local scriptLoadAt = tick();
-local scriptVersion = 2;
+local scriptVersion = 3;
 local discordCode = 'Gxg42Eshpy';
 
 local cloneref = cloneref or function(inst) return inst; end;
@@ -729,6 +729,11 @@ do -- script funcs
 			temp.flyloop = nil;
 		end;
 
+		if (temp.vflydied) then
+			temp.vflydied:Disconnect();
+			temp.vflydied = nil;
+		end;
+
 		actionService:UnbindAction('vacvflyup');
 		actionService:UnbindAction('vacvflydown');
 
@@ -748,7 +753,7 @@ do -- script funcs
 					temp.flyvertical = 1;
 				elseif (state == Enum.UserInputState.End) then
 					temp.flyvertical = 0;
-				end
+				end;
 			end, false, Enum.KeyCode.Space);
 
 			actionService:BindAction('vacvflydown', function(_, state)
@@ -756,16 +761,13 @@ do -- script funcs
 					temp.flyvertical = -1;
 				elseif (state == Enum.UserInputState.End) then
 					temp.flyvertical = 0;
-				end
+				end;
 			end, false, Enum.KeyCode.LeftControl);
 		end;
 
 		temp.flyloop = vac.connect(runService.Heartbeat, function(dt)
-			local root = vac.utilfuncs.getRoot();
-			if (not root) then return; end;
-
-			local hum = lplr.Character:FindFirstChildOfClass('Humanoid');
-			if (not hum) then return; end;
+			local root, hum = vac.utilfuncs.getBoth();
+			if (not root or not hum) then return; end;
 
 			if (inputService:IsKeyDown(Enum.KeyCode.Space) and not inputService:GetFocusedTextBox()) then
 				temp.flyvertical = 1;
@@ -785,6 +787,12 @@ do -- script funcs
 			else
 				if (vfly) then
 					utils.getMovePart().AssemblyLinearVelocity = Vector3.new(moveDir.X, temp.flyvertical, moveDir.Z) * temp.flyspeed;
+
+					temp.vflydied = temp.vflydied or vac.connect(hum.Died, function()
+						commands.execute('unfly');
+						temp.vflydied:Disconnect();
+						temp.vflydied = nil;
+					end);
 				else
 					root.AssemblyLinearVelocity = Vector3.new(moveDir.X, temp.flyvertical, moveDir.Z) * temp.flyspeed + Vector3.new(0, 2.25, 0);
 				end;
@@ -809,11 +817,9 @@ do -- script funcs
 		end;
 
 		temp.speedloop = vac.connect(runService.Heartbeat, function(dt)
-			local root = vac.utilfuncs.getRoot();
-			if (not root) then return; end;
-
-			local hum = lplr.Character:FindFirstChildOfClass('Humanoid');
-			if (not hum or hum.Sit) then return; end;
+			local root, hum = vac.utilfuncs.getBoth();
+			if (not root or not hum) then return; end;
+			if (hum.Sit) then return; end;
 
 			local moveDir = hum.MoveDirection;
 			local preVelo = root.AssemblyLinearVelocity;
@@ -1479,6 +1485,62 @@ do -- script funcs
 			vac.log(string.format('config "%s" has been renamed to "%s"', name, newname), 0);
 		end;
 	end;
+
+	do -- anti fling
+		local moddedParts = {};
+
+		local function onPlayerAdded(player)
+			if (player == lplr) then return; end;
+
+			if (not player.Character) then
+				player.CharacterAdded:Wait();
+			end;
+
+			for _, v in next, player.Character:GetDescendants() do
+				if (not v:IsA('BasePart')) then continue; end;
+				v.CanCollide = false;
+				moddedParts[v] = true;
+			end;
+		end;
+
+		local function onPlayerRemoving(player)
+			if (player == lplr or not player.Character) then return; end;
+
+			for _, v in next, player.Character:GetDescendants() do
+				if (not v:IsA('BasePart')) then continue; end;
+				if (not moddedParts[v]) then continue; end;
+				moddedParts[v] = nil;
+			end;
+		end;
+
+		function funcs.afInit()
+			temp.afAdded = vac.connect(players.PlayerAdded, onPlayerAdded);
+			temp.afRemoved = vac.connect(players.PlayerRemoving, onPlayerRemoving);
+
+			for _, v in next, players:GetPlayers() do
+				task.spawn(onPlayerAdded, v);
+			end;
+		end;
+
+		function funcs.afRevert()
+			if (temp.afAdded) then
+				temp.afAdded:Disconnect();
+				temp.afAdded = nil;
+			end;
+
+			if (temp.afRemoved) then
+				temp.afRemoved:Disconnect();
+				temp.afRemoved = nil;
+			end;
+
+			for _, v in next, moddedParts do
+				if (not v or v.CanCollide) then continue; end;
+				v.CanCollide = true;
+			end;
+
+			table.clear(moddedParts);
+		end;
+	end;
 end;
 
 do -- commands list
@@ -1558,6 +1620,17 @@ do -- commands list
 	list['configload [name]'] = 'executes all commands in the provided group';
 	list['configdelete [name]'] = 'deletes a config';
 	list['configrename [name] [newname]'] = 'renames a config to newname';
+	list['streamaura / loadaura [interval?]'] = 'loads the area around your camera if streaming enabeld is on';
+	list['unstreamaura / nostreamaura / noloadaura'] = 'disables streamaura';
+	list['antiafk / antiidle'] = 'prevents the game from kicking you for being afk';
+	list['unantiafk / unantiidle'] = 'disables antiafk';
+	list['enablereset'] = 'enables the reset button when you press escape';
+	list['fling'] = 'lets you fling people';
+	list['unfling'] = 'disables fling';
+	list['antifling'] = 'attemps to prevent players and objects from flinging you';
+	list['unantifling'] = 'disables anti fling';
+	list['friend [player]'] = 'sends a friend request to player';
+	list['enableshiftlock / enablesl'] = 'enables shift lock';
 end;
 
 do -- commands
@@ -1569,6 +1642,7 @@ do -- commands
 	local lightService = cloneref(game:GetService('Lighting'));
 	local uiService = cloneref(game:GetService('GuiService'));
 	local networkClient = cloneref(game:GetService('NetworkClient'));
+	local starterUi = cloneref(game:GetService('StarterGui'));
 
 	commands.register('eject', vac.unload);
 
@@ -1628,14 +1702,15 @@ do -- commands
 		vac.log('getting version, hold on a sec...', 0);
 
 		local sCommit = vac.decode(game:HttpGet('https://api.github.com/repos/Iratethisname10/vac/commits?path=main.lua'))[1].sha:sub(1, 10);
+		local sVersion = vac.decode(game:HttpGet('https://raw.githubusercontent.com/Iratethisname10/vac/refs/heads/main/version.json')).ver;
 
 		local cVersion = vac.constants.scriptversion;
 		local cCommit = vac.constants.commitversion:sub(1, 10);
 
 		vac.log(string.format('script cached version - %s (%s)', cVersion, cCommit), 0);
-		vac.log(string.format('server returned version - %s (%s)', scriptVersion, sCommit), 0);
+		vac.log(string.format('server returned version - %s (%s)', sVersion, sCommit), 0);
 
-		if (scriptVersion == cVersion and sCommit == cCommit) then
+		if (sVersion == cVersion and sCommit == cCommit) then
 			vac.log('script is up to date!', 0, vac.constants.colors.green);
 			return;
 		end;
@@ -2316,6 +2391,119 @@ do -- commands
 		if (not name or not newname) then return; end;
 		vac.funcs.renameConfig(name, newname);
 	end);
+
+	commands.register('streamaura', function(interval)
+		commands.execute('unstreamaura');
+
+		vac.temp.streamingaura = true;
+
+		while (vac.temp.streamingaura) do
+			if (not workspace.StreamingEnabled) then task.wait(); continue; end;
+
+			task.spawn(lplr.RequestStreamAroundAsync, lplr, cam.CFrame.Position);
+			task.wait(tonumber(interval) and interval or 0.5);
+		end;
+	end, { 'loadaura' });
+
+	commands.register('unstreamaura', function()
+		vac.temp.streamingaura = false;
+	end, { 'nostreamaura', 'noloadaura' });
+
+	commands.register('antiafk', function()
+		vac.temp.antiafkdontsend = true;
+		commands.execute('unantiafk');
+
+		if (getconnections) then
+			for _, v in next, getconnections(lplr.Idled) do
+				if (v.Function) then continue; end;
+				v:Disable();
+			end;
+		else
+			local virtualUser = cloneref(game:GetService('VirtualUser'));
+			vac.temp.antiafk = vac.connect(lplr.Idled, function()
+				virtualUser:CaptureController();
+				virtualUser:ClickButton2(Vector2.new());
+			end);
+		end;
+
+		vac.temp.antiafkdontsend = false;
+		vac.log('anti afk is active', 0);
+	end, { 'antiidle' });
+
+	commands.register('unantiafk', function()
+		if (vac.temp.antiafk) then
+			vac.temp.antiafk:Disconnect();
+			vac.temp.antiafk = nil;
+		else
+			for _, v in next, getconnections(lplr.Idled) do
+				if (v.Function) then continue; end;
+				v:Enable();
+			end;
+		end;
+
+		if (vac.temp.antiafkdontsend) then return; end;
+
+		vac.log('anti afk is no longer active', 0);
+	end, { 'unantiidle' });
+
+	commands.register('enablereset', function()
+		starterUi:SetCore('ResetButtonCallback', true);
+	end);
+
+	commands.register('fling', function()
+		commands.execute('unfling');
+
+		vac.temp.fling = vac.connect(runService.Heartbeat, function()
+			local root = vac.utilfuncs.getRoot();
+			if (not root) then return; end;
+
+			local preVelo = root.AssemblyLinearVelocity;
+			local factor = 0.1;
+
+			root.Velocity = (preVelo * 10000) + (Vector3.yAxis * 10000);
+			runService.RenderStepped:Wait();
+
+			root.AssemblyLinearVelocity = preVelo;
+			runService.Stepped:Wait();
+
+			root.AssemblyLinearVelocity = preVelo + Vector3.new(0, factor, 0);
+			factor *= -1;
+		end);
+	end);
+
+	commands.register('unfling', function()
+		if (vac.temp.fling) then
+			vac.temp.fling:Disconnect();
+			vac.temp.fling = nil;
+		end;
+	end);
+
+	commands.register('antifling', function()
+		commands.execute('unantifling');
+		vac.funcs.afInit();
+	end);
+
+	commands.register('unantifling', function()
+		vac.funcs.afRevert();
+	end);
+
+	commands.register('friend', function(player)
+		player = vac.utilfuncs.getPlayer(player);
+		if (not player) then return; end;
+
+		if (typeof(player) == 'table') then
+			for _, v in next, player do
+				task.spawn(lplr.RequestFriendship, lplr, v);
+			end;
+			return;
+		end;
+
+		task.spawn(lplr.RequestFriendship, lplr, player);
+	end);
+
+	commands.register('enableshiftlock', function()
+		lplr.DevEnableMouseLock = true;
+	end, { 'enablesl' });
 end;
 
 do -- end
